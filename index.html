@@ -148,8 +148,50 @@
     50% { transform: scale(1.25); }
   }
 
+  /* Live location status chip */
+  .geo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 22px;
+    padding: 11px 20px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1.5px solid rgba(201, 79, 109, 0.28);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--rose-deep);
+    min-height: 44px;
+    transition: all 0.3s ease;
+  }
+  .geo-chip .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--gold);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+  .geo-chip.active .dot { background: #3faf6e; }
+  .geo-chip.close {
+    border-color: var(--rose);
+    background: rgba(201, 79, 109, 0.12);
+    animation: chipPulse 1.4s ease-in-out infinite;
+  }
+  .geo-chip.warn { border-color: rgba(201, 161, 90, 0.6); color: #8a6a2f; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @keyframes chipPulse {
+    0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(201,79,109,0.25); }
+    50% { transform: scale(1.03); box-shadow: 0 0 0 9px rgba(201,79,109,0); }
+  }
+
+  .geo-help {
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    animation: fadeSlideIn 0.4s ease both;
+  }
+
   /* Inputs & buttons — 16px+ font so iOS Safari never auto-zooms */
-  .code-row { display: flex; gap: 10px; margin-top: 22px; }
+  .code-row { display: flex; gap: 10px; margin-top: 16px; }
   input.code {
     flex: 1;
     min-width: 0;
@@ -199,7 +241,7 @@
   }
   .btn.big { font-size: 20px; padding: 19px 46px; }
 
-  .hint-btn {
+  .link-btn {
     background: none;
     border: none;
     color: var(--gold);
@@ -208,6 +250,7 @@
     margin-top: 18px;
     cursor: pointer;
     -webkit-appearance: none;
+    min-height: 44px;
   }
   .hint-text {
     margin-top: 12px;
@@ -215,6 +258,14 @@
     color: var(--ink-soft);
     line-height: 1.5;
     animation: fadeSlideIn 0.4s ease both;
+  }
+
+  .fallback-box { animation: fadeSlideIn 0.4s ease both; margin-top: 6px; }
+  .fallback-box .fallback-note {
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin-top: 10px;
   }
 
   .shake { animation: shake 0.45s ease; }
@@ -239,7 +290,6 @@
     100% { transform: scale(1); opacity: 1; }
   }
 
-  /* Unlock interstitial */
   .unlock-check {
     font-size: 74px;
     animation: bounceIn 0.7s ease both;
@@ -306,47 +356,81 @@
    ✏️  EDIT THIS SECTION — everything personal lives here.
    ================================================================
    HOW IT WORKS
-   - Each "stop" is a real-world location on your scavenger hunt.
-   - Write a clue that leads her to that spot.
-   - At each spot, hide a card/note with that stop's CODE word on it
-     (or have a friend there to tell her the word).
-   - She types the code into the app to unlock the next clue.
-   - After the last stop, the app plays the proposal sequence —
-     so make the final stop wherever YOU are waiting with the ring.
+   - Each "stop" is a real-world location with GPS coordinates.
+   - The app watches her location as she walks. When she gets within
+     `radius` meters of the stop, it automatically unlocks a personal
+     arrival message, then reveals the next clue.
+   - Each stop also has a backup `code` word. If GPS misbehaves
+     (deep indoors, permission denied), she can tap
+     "Trouble with your location?" and type the code instead —
+     so the proposal never gets stuck. Keep the codes with you.
 
-   TESTING TIP
+   GETTING COORDINATES
+   - Google Maps: press-and-hold on the exact spot → the lat,lng
+     appears in the search box / info card. Copy the two numbers.
+   - Apple Maps: drop a pin → swipe up on the place card → the
+     coordinates are listed (tap to copy).
+
+   PICKING A RADIUS (meters)
+   - Open outdoor spot (park, overlook): 35–50
+   - Street address / storefront: 50–60
+   - Indoors (café, restaurant): 60–80 — GPS drifts inside buildings.
+   - Keep different stops at least ~150 m apart, or she may unlock
+     the next stop instantly while standing at the previous one.
+
+   TESTING
+   - Add ?demo=1 to the URL to get a "Simulate arrival" button on
+     every clue so you can rehearse the flow from your couch.
    - Tap the "made with ♥" text at the bottom 5 times fast to reset
-     progress so you can rehearse the whole flow.
+     all progress.
+   - Do one real walk-through on your own phone before the big day.
    ================================================================ */
 const CONFIG = {
   herName: "My Love",           // Her name, e.g. "Emily"
   yourName: "Me",               // Your name, e.g. "Sam"
 
   introTitle: "A Little Adventure",
-  introMessage: "I've hidden a trail of clues in the places that\nmean the most to us. Follow them one by one —\nsomething special is waiting at the end.",
+  introMessage: "I've hidden a trail of clues in the places that\nmean the most to us. Follow them one by one —\nsomething special is waiting at the end.\n\nThe app needs your location so it knows\nthe moment you arrive. ♥",
   startButton: "Begin ♥",
 
+  // Show "1.2 km away" style live feedback while she walks.
+  // Set to false if you'd rather she navigate purely from the clue.
+  showDistance: true,
+
   // Add, remove, or reorder stops freely — the app adapts.
+  // REPLACE the lat/lng below with your real locations!
   stops: [
     {
       emoji: "☕️",
       title: "Where It Began",
       clue: "Go to the place where we had our very first date,\nand I was too nervous to finish my coffee.",
       hint: "You ordered a caramel latte. I still remember.",
-      code: "SPARK",        // the word hidden at this location
+      arrivalMessage: "This is where I first realized I never wanted\nto stop talking to you. I was so nervous my\nhands were shaking under the table.",
+      lat: 37.79940,            // ← REPLACE with the real spot
+      lng: -122.40780,
+      radius: 60,               // meters — she unlocks when this close
+      code: "SPARK",            // backup word if GPS fails
     },
     {
       emoji: "🌳",
       title: "Our Sunday Spot",
       clue: "Find the bench where we watched the sunset\nand talked until the streetlights came on.",
       hint: "It's under the big oak tree in the park.",
+      arrivalMessage: "Right here, you told me your biggest dream.\nI went home that night and wrote in my journal:\n\"I think she's the one.\"",
+      lat: 37.80140,
+      lng: -122.41000,
+      radius: 45,
       code: "SUNSET",
     },
     {
       emoji: "🍝",
       title: "Table for Two",
       clue: "Head to the restaurant where we celebrated\nyour big news — and split the tiramisu.",
-      hint: "You know the one. Ask the host for a note with your name on it.",
+      hint: "You know the one. Order dessert if you want — we have time.",
+      arrivalMessage: "I've never been prouder of anyone than I was\nof you that night. You looked so happy.\nI want front-row seats to all your wins, forever.",
+      lat: 37.79830,
+      lng: -122.40620,
+      radius: 70,
       code: "AMORE",
     },
     {
@@ -354,6 +438,10 @@ const CONFIG = {
       title: "Our Song",
       clue: "Go where we danced in the kitchen at 2am\nto a song we both pretended to know the words to.",
       hint: "Home. Check by the record player.",
+      arrivalMessage: "No fancy ballroom will ever beat our kitchen\nat 2am. Dancing badly with you is my favorite\nthing in the world.",
+      lat: 37.80020,
+      lng: -122.40350,
+      radius: 60,
       code: "DANCE",
     },
     {
@@ -361,6 +449,10 @@ const CONFIG = {
       title: "The Last Clue",
       clue: "One more stop. Come find me where the city\nlooks its best — I'll be waiting for you.",
       hint: "Look up. I'm at our overlook.",
+      arrivalMessage: "Turn around, my love.",
+      lat: 37.80250,
+      lng: -122.40550,
+      radius: 45,
       code: "FOREVER",
     },
   ],
@@ -385,18 +477,143 @@ const CONFIG = {
    ================================================================ */
 
 const app = document.getElementById("app");
-const STORAGE_KEY = "proposal_hunt_progress";
+const STORAGE_KEY = "proposal_hunt_state_v2";
+const DEMO = new URLSearchParams(location.search).has("demo");
 
-function getProgress() {
-  const v = parseInt(localStorage.getItem(STORAGE_KEY) || "-1", 10);
-  return Number.isNaN(v) ? -1 : v; // -1 = intro not passed; 0..n = current stop; n+1 = proposal
+/* ---------- state: { idx, phase } ----------
+   phase: 'clue' (walking to stop idx) | 'arrived' (at stop idx,
+   message shown) | 'buildup' | 'celebrate'. No stored state = intro. */
+function getState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (s && typeof s.idx === "number" && typeof s.phase === "string") return s;
+  } catch (e) { /* fall through */ }
+  return null;
 }
-function setProgress(v) { localStorage.setItem(STORAGE_KEY, String(v)); }
+function setState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+let state = getState();
 
 function normalize(s) { return s.trim().toUpperCase().replace(/\s+/g, " "); }
 
+/* ---------- geolocation ---------- */
+const geo = {
+  watchId: null,
+  status: "idle",   // idle | locating | active | denied | unavailable | error
+  lastPos: null,
+  streak: 0,        // consecutive in-radius fixes (defends against GPS jitter)
+  slow: false,      // true when we've waited a long time with no fix
+  slowTimer: null,
+};
+let onGeoChange = null; // set by the clue screen to refresh its chip
+
+function startWatch() {
+  if (geo.watchId !== null) return;
+  if (!("geolocation" in navigator)) {
+    geo.status = "unavailable";
+    if (onGeoChange) onGeoChange();
+    return;
+  }
+  geo.status = "locating";
+  if (onGeoChange) onGeoChange();
+  // If no fix (or permission answer) arrives within 20s, surface the
+  // backup code path so the hunt can never get stuck on a spinner.
+  clearTimeout(geo.slowTimer);
+  geo.slowTimer = setTimeout(() => {
+    if (geo.status === "locating") {
+      geo.slow = true;
+      if (onGeoChange) onGeoChange();
+    }
+  }, 20000);
+  geo.watchId = navigator.geolocation.watchPosition(pos => {
+    geo.status = "active";
+    geo.slow = false;
+    clearTimeout(geo.slowTimer);
+    geo.lastPos = pos;
+    handlePosition(pos);
+  }, err => {
+    geo.status = err.code === 1 ? "denied" : "error";
+    clearTimeout(geo.slowTimer);
+    if (onGeoChange) onGeoChange();
+  }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 });
+}
+function stopWatch() {
+  if (geo.watchId !== null && "geolocation" in navigator) {
+    navigator.geolocation.clearWatch(geo.watchId);
+  }
+  geo.watchId = null;
+  geo.status = "idle";
+}
+
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function currentStop() {
+  return state && state.phase === "clue" ? CONFIG.stops[state.idx] : null;
+}
+
+function handlePosition(pos) {
+  const stop = currentStop();
+  if (!stop || stop.lat == null || stop.lng == null) {
+    if (onGeoChange) onGeoChange();
+    return;
+  }
+  const d = distanceMeters(pos.coords.latitude, pos.coords.longitude, stop.lat, stop.lng);
+  const acc = pos.coords.accuracy || 999;
+
+  // Count consecutive fixes inside the radius (allowing a little
+  // slack for GPS accuracy). One precise fix, or two in a row of
+  // any quality, counts as "arrived" — this avoids a single wild
+  // reading teleporting her to the finish line.
+  const inRadius = d <= stop.radius + Math.min(acc, 30);
+  if (inRadius) {
+    geo.streak++;
+    if (acc <= 25 || geo.streak >= 2) {
+      geo.streak = 0;
+      arriveAtStop();
+      return;
+    }
+  } else {
+    geo.streak = 0;
+  }
+  if (onGeoChange) onGeoChange(d);
+}
+
+function arriveAtStop() {
+  if (!state || state.phase !== "clue") return; // fire once
+  state = { idx: state.idx, phase: "arrived" };
+  setState(state);
+  showArrived();
+}
+
+function formatDistance(d) {
+  if (d >= 950) return (d / 1000).toFixed(1) + " km away";
+  if (d >= 100) return Math.round(d / 10) * 10 + " m away";
+  return Math.max(10, Math.round(d / 5) * 5) + " m away";
+}
+
+/* ---------- keep the screen awake while she navigates ---------- */
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) { /* best effort only */ }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && state && state.phase === "clue") {
+    requestWakeLock();
+  }
+});
+
 /* ---------- screen transitions ---------- */
 function render(html, opts = {}) {
+  onGeoChange = null;
   const old = app.querySelector(".screen");
   const swap = () => {
     app.innerHTML = `<div class="screen">${html}</div>`;
@@ -422,6 +639,7 @@ function progressHearts(current) {
 
 /* ---------- screens ---------- */
 function showIntro() {
+  stopWatch();
   render(`
     <div class="eyebrow">For ${escapeHtml(CONFIG.herName)}</div>
     <h1 class="script">${escapeHtml(CONFIG.introTitle)}</h1>
@@ -432,15 +650,106 @@ function showIntro() {
   `, {
     onMount(el) {
       el.querySelector("#startBtn").addEventListener("click", () => {
-        setProgress(0);
+        state = { idx: 0, phase: "clue" };
+        setState(state);
+        // Starting the watch inside the tap handler makes iOS show
+        // the location permission prompt right away.
+        startWatch();
+        requestWakeLock();
         showStop(0);
       });
     }
   });
 }
 
+function geoChipHtml() {
+  return `<div><div class="geo-chip" id="geoChip"><span class="dot"></span><span id="geoText">Finding you…</span></div></div>
+          <div id="geoHelp"></div>`;
+}
+
+function updateGeoChip(el, stop, dist) {
+  const chip = el.querySelector("#geoChip");
+  const text = el.querySelector("#geoText");
+  const help = el.querySelector("#geoHelp");
+  if (!chip) return;
+  chip.className = "geo-chip";
+  help.innerHTML = "";
+
+  if (geo.status === "denied") {
+    chip.classList.add("warn");
+    text.textContent = "Location is turned off";
+    help.innerHTML = `<div class="geo-help">To let the magic work: tap the <b>ᴀA</b> in Safari's address bar → Website Settings → Location → <b>Allow</b>. (Or use the secret word below.)</div>`;
+    showFallback(el, true);
+  } else if (geo.status === "unavailable" || geo.status === "error") {
+    chip.classList.add("warn");
+    text.textContent = "Can't find a GPS signal";
+    help.innerHTML = `<div class="geo-help">No worries — when you get there, use the secret word instead.</div>`;
+    showFallback(el, true);
+  } else if (geo.status === "locating" || dist == null) {
+    if (geo.slow) {
+      chip.classList.add("warn");
+      text.textContent = "Still looking for you…";
+      help.innerHTML = `<div class="geo-help">GPS can be shy. Make sure Safari has location access (tap <b>ᴀA</b> in the address bar → Website Settings → Location → <b>Allow</b>) — or use the secret word below.</div>`;
+      showFallback(el, true);
+    } else {
+      text.textContent = "Finding you…";
+    }
+  } else {
+    chip.classList.add("active");
+    if (dist <= stop.radius * 2.5) {
+      chip.classList.add("close");
+      text.textContent = "So close… keep going ♥";
+    } else if (CONFIG.showDistance) {
+      text.textContent = formatDistance(dist);
+    } else {
+      text.textContent = "Watching for your arrival…";
+    }
+  }
+}
+
+function showFallback(el, auto) {
+  const box = el.querySelector("#fallbackBox");
+  if (!box || box.dataset.open === "1") return;
+  box.dataset.open = "1";
+  const toggle = el.querySelector("#fallbackToggle");
+  if (toggle) toggle.style.display = "none";
+  box.innerHTML = `
+    <div class="fallback-box">
+      <div class="fallback-note">${auto ? "" : "If GPS is being shy, the spot itself holds a secret word — or ask the one who sent you. ♥"}</div>
+      <div class="code-row">
+        <input class="code" id="codeInput" type="text" autocomplete="off" autocapitalize="characters"
+               autocorrect="off" spellcheck="false" enterkeyhint="go"
+               placeholder="Secret word">
+      </div>
+      <button class="btn block" id="unlockBtn">Unlock</button>
+      <div id="feedback"></div>
+    </div>`;
+  const stop = CONFIG.stops[state.idx];
+  const input = box.querySelector("#codeInput");
+  const card = el.querySelector(".card");
+  const attempt = () => {
+    if (normalize(input.value) === normalize(stop.code)) {
+      input.blur();
+      arriveAtStop();
+    } else {
+      card.classList.remove("shake");
+      void card.offsetWidth;
+      card.classList.add("shake");
+      box.querySelector("#feedback").innerHTML =
+        `<div class="wrong-msg">Not quite — look a little closer. ♥</div>`;
+      input.select();
+    }
+  };
+  box.querySelector("#unlockBtn").addEventListener("click", attempt);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") attempt(); });
+  input.addEventListener("focus", () => {
+    setTimeout(() => input.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+  });
+}
+
 function showStop(i) {
   const stop = CONFIG.stops[i];
+  const hasGeo = stop.lat != null && stop.lng != null;
   render(`
     ${progressHearts(i)}
     <div class="eyebrow">Clue ${i + 1} of ${CONFIG.stops.length}</div>
@@ -448,72 +757,72 @@ function showStop(i) {
     <h2 class="script">${escapeHtml(stop.title)}</h2>
     <div class="card">
       <p class="clue-text">${escapeHtml(stop.clue)}</p>
-      <div class="code-row">
-        <input class="code" id="codeInput" type="text" autocomplete="off" autocapitalize="characters"
-               autocorrect="off" spellcheck="false" enterkeyhint="go"
-               placeholder="Enter the secret word">
-      </div>
-      <button class="btn block" id="unlockBtn">Unlock</button>
-      <div id="feedback"></div>
-      <button class="hint-btn" id="hintBtn">Need a hint?</button>
+      ${hasGeo ? geoChipHtml() : ""}
+      <button class="link-btn" id="hintBtn">Need a hint?</button>
       <div id="hintBox"></div>
+      ${hasGeo ? `<button class="link-btn" id="fallbackToggle" style="display:block;margin:6px auto 0">Trouble with your location?</button>` : ""}
+      <div id="fallbackBox"></div>
+      ${DEMO ? `<button class="btn ghost block" id="demoArrive" style="margin-top:18px">📍 Simulate arrival (demo)</button>` : ""}
     </div>
   `, {
     onMount(el) {
-      const input = el.querySelector("#codeInput");
-      const card = el.querySelector(".card");
-      const feedback = el.querySelector("#feedback");
-
-      const attempt = () => {
-        if (normalize(input.value) === normalize(stop.code)) {
-          input.blur();
-          const next = i + 1;
-          setProgress(next);
-          showUnlocked(next);
-        } else {
-          card.classList.remove("shake");
-          void card.offsetWidth; // restart animation
-          card.classList.add("shake");
-          feedback.innerHTML = `<div class="wrong-msg">Not quite — look a little closer at ${escapeHtml(stop.title.toLowerCase())}. ♥</div>`;
-          input.select();
-        }
-      };
-
-      el.querySelector("#unlockBtn").addEventListener("click", attempt);
-      input.addEventListener("keydown", e => { if (e.key === "Enter") attempt(); });
-      // Keep the input visible above the iOS keyboard.
-      input.addEventListener("focus", () => {
-        setTimeout(() => input.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
-      });
-
       el.querySelector("#hintBtn").addEventListener("click", () => {
         el.querySelector("#hintBox").innerHTML = `<div class="hint-text">${escapeHtml(stop.hint)}</div>`;
       });
+
+      if (hasGeo) {
+        geo.streak = 0;
+        startWatch();
+        onGeoChange = dist => updateGeoChip(el, stop, dist);
+        // Paint the chip immediately from whatever we already know.
+        if (geo.lastPos) handlePosition(geo.lastPos); else updateGeoChip(el, stop, null);
+        el.querySelector("#fallbackToggle").addEventListener("click", () => showFallback(el, false));
+      } else {
+        // No coordinates for this stop — it's a code-word stop.
+        showFallback(el, true);
+      }
+
+      if (DEMO) {
+        el.querySelector("#demoArrive").addEventListener("click", () => arriveAtStop());
+      }
     }
   });
 }
 
-function showUnlocked(next) {
-  const last = next >= CONFIG.stops.length;
-  burstConfetti(last ? 90 : 36);
+function showArrived() {
+  const i = state.idx;
+  const stop = CONFIG.stops[i];
+  const last = i === CONFIG.stops.length - 1;
+  burstConfetti(last ? 90 : 40);
   render(`
-    ${progressHearts(next)}
-    <span class="unlock-check">${last ? "💖" : "🔓"}</span>
-    <h2 class="script">${last ? "You made it…" : "Clue unlocked!"}</h2>
-    <p class="lead" style="margin-top:10px">${last ? "Take a breath. This next part is important." : "On to the next one, my love."}</p>
-    <button class="btn big" id="nextBtn" style="margin-top:26px">${last ? "I'm ready ♥" : "Next clue →"}</button>
+    ${progressHearts(i + 1)}
+    <span class="unlock-check">${last ? "💖" : "📍"}</span>
+    <h2 class="script">You're here…</h2>
+    <div class="card">
+      <p class="clue-text">${escapeHtml(stop.arrivalMessage)}</p>
+      <button class="btn block big" id="nextBtn" style="margin-top:22px">
+        ${last ? "I'm ready ♥" : "Reveal the next clue →"}
+      </button>
+    </div>
   `, {
     onMount(el) {
       el.querySelector("#nextBtn").addEventListener("click", () => {
-        if (last) showBuildup();
-        else showStop(next);
+        if (last) {
+          showBuildup();
+        } else {
+          state = { idx: i + 1, phase: "clue" };
+          setState(state);
+          showStop(i + 1);
+        }
       });
     }
   });
 }
 
 function showBuildup() {
-  setProgress(CONFIG.stops.length + 1);
+  state = { idx: CONFIG.stops.length, phase: "buildup" };
+  setState(state);
+  stopWatch(); // the hunt is over — no more GPS needed
   const lines = CONFIG.buildupLines.map((l, idx) =>
     `<p class="buildup-line" style="animation-delay:${idx * 1.6}s">${escapeHtml(l)}</p>`
   ).join("");
@@ -542,7 +851,9 @@ function showBuildup() {
 }
 
 function showCelebration() {
-  setProgress(CONFIG.stops.length + 2);
+  state = { idx: CONFIG.stops.length, phase: "celebrate" };
+  setState(state);
+  stopWatch();
   burstConfetti(160);
   setTimeout(() => burstConfetti(120), 900);
   setTimeout(() => burstConfetti(120), 2000);
@@ -660,12 +971,21 @@ function escapeHtml(s) {
 
 /* ---------- boot: resume where she left off ---------- */
 startAmbience();
-const p = getProgress();
-if (p < 0) showIntro();
-else if (p < CONFIG.stops.length) showStop(p);
-else if (p === CONFIG.stops.length) showUnlocked(p);
-else if (p === CONFIG.stops.length + 1) showBuildup();
-else showCelebration();
+if (!state) {
+  showIntro();
+} else if (state.phase === "clue") {
+  // Permission was already granted mid-hunt, so the watch restarts
+  // silently. If it can't, the chip offers the fix + fallback word.
+  startWatch();
+  requestWakeLock();
+  showStop(state.idx);
+} else if (state.phase === "arrived") {
+  showArrived();
+} else if (state.phase === "buildup") {
+  showBuildup();
+} else {
+  showCelebration();
+}
 </script>
 </body>
 </html>
