@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#fdf6f0">
+<title>A Little Adventure</title>
+<style>
+  /* ============================================================
+     iPhone-first styling. Uses safe-area insets and dvh so the
+     layout sits correctly under the notch and above the home bar.
+     ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg-1: #fdf6f0;
+    --bg-2: #fbe8e4;
+    --bg-3: #f6d5d3;
+    --ink: #4a2c35;
+    --ink-soft: #8a626e;
+    --rose: #c94f6d;
+    --rose-deep: #a83b57;
+    --gold: #c9a15a;
+    --card: rgba(255, 255, 255, 0.82);
+    --shadow: 0 10px 30px rgba(168, 59, 87, 0.16);
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: var(--ink);
+    background: linear-gradient(160deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%);
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+
+  #app {
+    position: relative;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 24px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Floating background hearts */
+  .bg-heart {
+    position: fixed;
+    font-size: 22px;
+    opacity: 0;
+    pointer-events: none;
+    animation: floatUp linear forwards;
+    z-index: 0;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) rotate(0deg) scale(0.8); opacity: 0; }
+    12%  { opacity: 0.35; }
+    85%  { opacity: 0.25; }
+    100% { transform: translateY(-110dvh) rotate(28deg) scale(1.15); opacity: 0; }
+  }
+
+  .screen {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+    animation: fadeSlideIn 0.55s ease both;
+  }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .screen.leaving {
+    animation: fadeSlideOut 0.35s ease both;
+  }
+  @keyframes fadeSlideOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-18px); }
+  }
+
+  .script {
+    font-family: "Snell Roundhand", "Savoye LET", "Apple Chancery", cursive;
+    color: var(--rose-deep);
+  }
+
+  h1.script { font-size: 44px; font-weight: 400; line-height: 1.15; margin-bottom: 6px; }
+  h2.script { font-size: 34px; font-weight: 400; line-height: 1.2; }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  .card {
+    background: var(--card);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 30px 24px;
+    margin-top: 18px;
+  }
+
+  .clue-text {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 20px;
+    line-height: 1.55;
+    color: var(--ink);
+    font-style: italic;
+    white-space: pre-line;
+  }
+
+  .lead {
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+
+  /* Progress hearts */
+  .progress {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0 4px;
+    font-size: 18px;
+  }
+  .progress span { opacity: 0.28; transition: all 0.4s ease; filter: grayscale(60%); }
+  .progress span.done { opacity: 1; filter: none; transform: scale(1.12); }
+  .progress span.current { opacity: 0.75; filter: none; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+  }
+
+  /* Live location status chip */
+  .geo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 22px;
+    padding: 11px 20px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1.5px solid rgba(201, 79, 109, 0.28);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--rose-deep);
+    min-height: 44px;
+    transition: all 0.3s ease;
+  }
+  .geo-chip .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--gold);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+  .geo-chip.active .dot { background: #3faf6e; }
+  .geo-chip.close {
+    border-color: var(--rose);
+    background: rgba(201, 79, 109, 0.12);
+    animation: chipPulse 1.4s ease-in-out infinite;
+  }
+  .geo-chip.warn { border-color: rgba(201, 161, 90, 0.6); color: #8a6a2f; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @keyframes chipPulse {
+    0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(201,79,109,0.25); }
+    50% { transform: scale(1.03); box-shadow: 0 0 0 9px rgba(201,79,109,0); }
+  }
+
+  .geo-help {
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    animation: fadeSlideIn 0.4s ease both;
+  }
+
+  /* Inputs & buttons — 16px+ font so iOS Safari never auto-zooms */
+  .code-row { display: flex; gap: 10px; margin-top: 16px; }
+  input.code {
+    flex: 1;
+    min-width: 0;
+    font-size: 17px;
+    padding: 15px 16px;
+    border-radius: 16px;
+    border: 1.5px solid rgba(201, 79, 109, 0.35);
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--ink);
+    text-align: center;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input.code:focus {
+    border-color: var(--rose);
+    box-shadow: 0 0 0 4px rgba(201, 79, 109, 0.12);
+  }
+  input.code::placeholder { letter-spacing: 0.02em; text-transform: none; color: #c9a4ad; }
+
+  .btn {
+    display: inline-block;
+    font-size: 17px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+    border: none;
+    border-radius: 999px;
+    padding: 16px 34px;
+    box-shadow: 0 8px 22px rgba(168, 59, 87, 0.35);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .btn:active { transform: scale(0.96); box-shadow: 0 4px 12px rgba(168, 59, 87, 0.3); }
+  .btn.block { width: 100%; margin-top: 14px; }
+  .btn.ghost {
+    background: transparent;
+    color: var(--rose-deep);
+    box-shadow: none;
+    border: 1.5px solid rgba(201, 79, 109, 0.4);
+    font-weight: 500;
+  }
+  .btn.big { font-size: 20px; padding: 19px 46px; }
+
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--gold);
+    font-size: 15px;
+    font-weight: 600;
+    margin-top: 18px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    min-height: 44px;
+  }
+  .hint-text {
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    animation: fadeSlideIn 0.4s ease both;
+  }
+
+  .fallback-box { animation: fadeSlideIn 0.4s ease both; margin-top: 6px; }
+  .fallback-box .fallback-note {
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    margin-top: 10px;
+  }
+
+  .shake { animation: shake 0.45s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-9px); }
+    40% { transform: translateX(9px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
+  .wrong-msg {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--rose-deep);
+    animation: fadeSlideIn 0.3s ease both;
+  }
+
+  .stop-emoji { font-size: 52px; margin-bottom: 10px; display: block; animation: bounceIn 0.6s ease both; }
+  @keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .unlock-check {
+    font-size: 74px;
+    animation: bounceIn 0.7s ease both;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  /* Proposal buildup lines */
+  .buildup-line {
+    font-family: Georgia, serif;
+    font-size: 23px;
+    line-height: 1.55;
+    color: var(--ink);
+    opacity: 0;
+    animation: fadeSlideIn 1.1s ease forwards;
+    margin: 14px 0;
+  }
+
+  .proposal-title {
+    font-family: "Snell Roundhand", "Apple Chancery", cursive;
+    font-size: 54px;
+    line-height: 1.15;
+    color: var(--rose-deep);
+    animation: bounceIn 0.9s ease both;
+    margin: 10px 0 26px;
+  }
+
+  .yes-row { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 10px; }
+
+  .celebrate-names {
+    font-family: "Snell Roundhand", "Apple Chancery", cursive;
+    font-size: 40px;
+    color: var(--rose-deep);
+    margin: 14px 0 6px;
+  }
+
+  .footer-heart {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom) + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 15px;
+    opacity: 0.45;
+    z-index: 2;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  canvas#confetti {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+  }
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div id="app"></div>
+<div class="footer-heart" id="resetHeart">made with ♥</div>
+
+<script>
+/* ================================================================
+   ✏️  EDIT THIS SECTION — everything personal lives here.
+   ================================================================
+   HOW IT WORKS
+   - Each "stop" is a real-world location with GPS coordinates.
+   - The app watches her location as she walks. When she gets within
+     `radius` meters of the stop, it automatically unlocks a personal
+     arrival message, then reveals the next clue.
+   - Each stop also has a backup `code` word. If GPS misbehaves
+     (deep indoors, permission denied), she can tap
+     "Trouble with your location?" and type the code instead —
+     so the proposal never gets stuck. Keep the codes with you.
+
+   GETTING COORDINATES
+   - Google Maps: press-and-hold on the exact spot → the lat,lng
+     appears in the search box / info card. Copy the two numbers.
+   - Apple Maps: drop a pin → swipe up on the place card → the
+     coordinates are listed (tap to copy).
+
+   PICKING A RADIUS (meters)
+   - Open outdoor spot (park, overlook): 35–50
+   - Street address / storefront: 50–60
+   - Indoors (café, restaurant): 60–80 — GPS drifts inside buildings.
+   - Keep different stops at least ~150 m apart, or she may unlock
+     the next stop instantly while standing at the previous one.
+
+   TESTING
+   - Add ?demo=1 to the URL to get a "Simulate arrival" button on
+     every clue so you can rehearse the flow from your couch.
+   - Tap the "made with ♥" text at the bottom 5 times fast to reset
+     all progress.
+   - Do one real walk-through on your own phone before the big day.
+   ================================================================ */
+const CONFIG = {
+  herName: "My Love",           // Her name, e.g. "Emily"
+  yourName: "Me",               // Your name, e.g. "Sam"
+
+  introTitle: "A Little Adventure",
+  introMessage: "I've hidden a trail of clues in the places that\nmean the most to us. Follow them one by one —\nsomething special is waiting at the end.\n\nThe app needs your location so it knows\nthe moment you arrive. ♥",
+  startButton: "Begin ♥",
+
+  // Show "1.2 km away" style live feedback while she walks.
+  // Set to false if you'd rather she navigate purely from the clue.
+  showDistance: true,
+
+  // Add, remove, or reorder stops freely — the app adapts.
+  // REPLACE the lat/lng below with your real locations!
+  stops: [
+    {
+      emoji: "☕️",
+      title: "Where It Began",
+      clue: "Go to the place where we had our very first date,\nand I was too nervous to finish my coffee.",
+      hint: "You ordered a caramel latte. I still remember.",
+      arrivalMessage: "This is where I first realized I never wanted\nto stop talking to you. I was so nervous my\nhands were shaking under the table.",
+      lat: 37.79940,            // ← REPLACE with the real spot
+      lng: -122.40780,
+      radius: 60,               // meters — she unlocks when this close
+      code: "SPARK",            // backup word if GPS fails
+    },
+    {
+      emoji: "🌳",
+      title: "Our Sunday Spot",
+      clue: "Find the bench where we watched the sunset\nand talked until the streetlights came on.",
+      hint: "It's under the big oak tree in the park.",
+      arrivalMessage: "Right here, you told me your biggest dream.\nI went home that night and wrote in my journal:\n\"I think she's the one.\"",
+      lat: 37.80140,
+      lng: -122.41000,
+      radius: 45,
+      code: "SUNSET",
+    },
+    {
+      emoji: "🍝",
+      title: "Table for Two",
+      clue: "Head to the restaurant where we celebrated\nyour big news — and split the tiramisu.",
+      hint: "You know the one. Order dessert if you want — we have time.",
+      arrivalMessage: "I've never been prouder of anyone than I was\nof you that night. You looked so happy.\nI want front-row seats to all your wins, forever.",
+      lat: 37.79830,
+      lng: -122.40620,
+      radius: 70,
+      code: "AMORE",
+    },
+    {
+      emoji: "🎶",
+      title: "Our Song",
+      clue: "Go where we danced in the kitchen at 2am\nto a song we both pretended to know the words to.",
+      hint: "Home. Check by the record player.",
+      arrivalMessage: "No fancy ballroom will ever beat our kitchen\nat 2am. Dancing badly with you is my favorite\nthing in the world.",
+      lat: 37.80020,
+      lng: -122.40350,
+      radius: 60,
+      code: "DANCE",
+    },
+    {
+      emoji: "💫",
+      title: "The Last Clue",
+      clue: "One more stop. Come find me where the city\nlooks its best — I'll be waiting for you.",
+      hint: "Look up. I'm at our overlook.",
+      arrivalMessage: "Turn around, my love.",
+      lat: 37.80250,
+      lng: -122.40550,
+      radius: 45,
+      code: "FOREVER",
+    },
+  ],
+
+  // Shown one line at a time before the big question.
+  buildupLines: [
+    "You found every clue.",
+    "Every place we've been, every memory we've made —",
+    "they were all leading here.",
+    "I have one last question…",
+  ],
+
+  proposalQuestion: "Will you marry me?",
+  yesButton: "YES! 💍",
+  yesButtonAlt: "Absolutely yes ♥",
+
+  celebrationTitle: "She said yes!",
+  celebrationMessage: "This is just the beginning.\nNow come here so I can put this ring on you. ♥",
+};
+/* ================================================================
+   End of editable section. Code below runs the experience.
+   ================================================================ */
+
+const app = document.getElementById("app");
+const STORAGE_KEY = "proposal_hunt_state_v2";
+const DEMO = new URLSearchParams(location.search).has("demo");
+
+/* ---------- state: { idx, phase } ----------
+   phase: 'clue' (walking to stop idx) | 'arrived' (at stop idx,
+   message shown) | 'buildup' | 'celebrate'. No stored state = intro. */
+function getState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (s && typeof s.idx === "number" && typeof s.phase === "string") return s;
+  } catch (e) { /* fall through */ }
+  return null;
+}
+function setState(s) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+let state = getState();
+
+function normalize(s) { return s.trim().toUpperCase().replace(/\s+/g, " "); }
+
+/* ---------- geolocation ---------- */
+const geo = {
+  watchId: null,
+  status: "idle",   // idle | locating | active | denied | unavailable | error
+  lastPos: null,
+  streak: 0,        // consecutive in-radius fixes (defends against GPS jitter)
+  slow: false,      // true when we've waited a long time with no fix
+  slowTimer: null,
+};
+let onGeoChange = null; // set by the clue screen to refresh its chip
+
+function startWatch() {
+  if (geo.watchId !== null) return;
+  if (!("geolocation" in navigator)) {
+    geo.status = "unavailable";
+    if (onGeoChange) onGeoChange();
+    return;
+  }
+  geo.status = "locating";
+  if (onGeoChange) onGeoChange();
+  // If no fix (or permission answer) arrives within 20s, surface the
+  // backup code path so the hunt can never get stuck on a spinner.
+  clearTimeout(geo.slowTimer);
+  geo.slowTimer = setTimeout(() => {
+    if (geo.status === "locating") {
+      geo.slow = true;
+      if (onGeoChange) onGeoChange();
+    }
+  }, 20000);
+  geo.watchId = navigator.geolocation.watchPosition(pos => {
+    geo.status = "active";
+    geo.slow = false;
+    clearTimeout(geo.slowTimer);
+    geo.lastPos = pos;
+    handlePosition(pos);
+  }, err => {
+    geo.status = err.code === 1 ? "denied" : "error";
+    clearTimeout(geo.slowTimer);
+    if (onGeoChange) onGeoChange();
+  }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 });
+}
+function stopWatch() {
+  if (geo.watchId !== null && "geolocation" in navigator) {
+    navigator.geolocation.clearWatch(geo.watchId);
+  }
+  geo.watchId = null;
+  geo.status = "idle";
+}
+
+function distanceMeters(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function currentStop() {
+  return state && state.phase === "clue" ? CONFIG.stops[state.idx] : null;
+}
+
+function handlePosition(pos) {
+  const stop = currentStop();
+  if (!stop || stop.lat == null || stop.lng == null) {
+    if (onGeoChange) onGeoChange();
+    return;
+  }
+  const d = distanceMeters(pos.coords.latitude, pos.coords.longitude, stop.lat, stop.lng);
+  const acc = pos.coords.accuracy || 999;
+
+  // Count consecutive fixes inside the radius (allowing a little
+  // slack for GPS accuracy). One precise fix, or two in a row of
+  // any quality, counts as "arrived" — this avoids a single wild
+  // reading teleporting her to the finish line.
+  const inRadius = d <= stop.radius + Math.min(acc, 30);
+  if (inRadius) {
+    geo.streak++;
+    if (acc <= 25 || geo.streak >= 2) {
+      geo.streak = 0;
+      arriveAtStop();
+      return;
+    }
+  } else {
+    geo.streak = 0;
+  }
+  if (onGeoChange) onGeoChange(d);
+}
+
+function arriveAtStop() {
+  if (!state || state.phase !== "clue") return; // fire once
+  state = { idx: state.idx, phase: "arrived" };
+  setState(state);
+  showArrived();
+}
+
+function formatDistance(d) {
+  if (d >= 950) return (d / 1000).toFixed(1) + " km away";
+  if (d >= 100) return Math.round(d / 10) * 10 + " m away";
+  return Math.max(10, Math.round(d / 5) * 5) + " m away";
+}
+
+/* ---------- keep the screen awake while she navigates ---------- */
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) { /* best effort only */ }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && state && state.phase === "clue") {
+    requestWakeLock();
+  }
+});
+
+/* ---------- screen transitions ---------- */
+function render(html, opts = {}) {
+  onGeoChange = null;
+  const old = app.querySelector(".screen");
+  const swap = () => {
+    app.innerHTML = `<div class="screen">${html}</div>`;
+    if (opts.onMount) opts.onMount(app.querySelector(".screen"));
+  };
+  if (old) {
+    old.classList.add("leaving");
+    setTimeout(swap, 320);
+  } else {
+    swap();
+  }
+}
+
+function progressHearts(current) {
+  const n = CONFIG.stops.length;
+  let out = '<div class="progress">';
+  for (let i = 0; i < n; i++) {
+    const cls = i < current ? "done" : i === current ? "current" : "";
+    out += `<span class="${cls}">${i < current ? "❤️" : "🤍"}</span>`;
+  }
+  return out + "</div>";
+}
+
+/* ---------- screens ---------- */
+function showIntro() {
+  stopWatch();
+  render(`
+    <div class="eyebrow">For ${escapeHtml(CONFIG.herName)}</div>
+    <h1 class="script">${escapeHtml(CONFIG.introTitle)}</h1>
+    <div class="card">
+      <p class="clue-text">${escapeHtml(CONFIG.introMessage)}</p>
+      <button class="btn block" id="startBtn">${escapeHtml(CONFIG.startButton)}</button>
+    </div>
+  `, {
+    onMount(el) {
+      el.querySelector("#startBtn").addEventListener("click", () => {
+        state = { idx: 0, phase: "clue" };
+        setState(state);
+        // Starting the watch inside the tap handler makes iOS show
+        // the location permission prompt right away.
+        startWatch();
+        requestWakeLock();
+        showStop(0);
+      });
+    }
+  });
+}
+
+function geoChipHtml() {
+  return `<div><div class="geo-chip" id="geoChip"><span class="dot"></span><span id="geoText">Finding you…</span></div></div>
+          <div id="geoHelp"></div>`;
+}
+
+function updateGeoChip(el, stop, dist) {
+  const chip = el.querySelector("#geoChip");
+  const text = el.querySelector("#geoText");
+  const help = el.querySelector("#geoHelp");
+  if (!chip) return;
+  chip.className = "geo-chip";
+  help.innerHTML = "";
+
+  if (geo.status === "denied") {
+    chip.classList.add("warn");
+    text.textContent = "Location is turned off";
+    help.innerHTML = `<div class="geo-help">To let the magic work: tap the <b>ᴀA</b> in Safari's address bar → Website Settings → Location → <b>Allow</b>. (Or use the secret word below.)</div>`;
+    showFallback(el, true);
+  } else if (geo.status === "unavailable" || geo.status === "error") {
+    chip.classList.add("warn");
+    text.textContent = "Can't find a GPS signal";
+    help.innerHTML = `<div class="geo-help">No worries — when you get there, use the secret word instead.</div>`;
+    showFallback(el, true);
+  } else if (geo.status === "locating" || dist == null) {
+    if (geo.slow) {
+      chip.classList.add("warn");
+      text.textContent = "Still looking for you…";
+      help.innerHTML = `<div class="geo-help">GPS can be shy. Make sure Safari has location access (tap <b>ᴀA</b> in the address bar → Website Settings → Location → <b>Allow</b>) — or use the secret word below.</div>`;
+      showFallback(el, true);
+    } else {
+      text.textContent = "Finding you…";
+    }
+  } else {
+    chip.classList.add("active");
+    if (dist <= stop.radius * 2.5) {
+      chip.classList.add("close");
+      text.textContent = "So close… keep going ♥";
+    } else if (CONFIG.showDistance) {
+      text.textContent = formatDistance(dist);
+    } else {
+      text.textContent = "Watching for your arrival…";
+    }
+  }
+}
+
+function showFallback(el, auto) {
+  const box = el.querySelector("#fallbackBox");
+  if (!box || box.dataset.open === "1") return;
+  box.dataset.open = "1";
+  const toggle = el.querySelector("#fallbackToggle");
+  if (toggle) toggle.style.display = "none";
+  box.innerHTML = `
+    <div class="fallback-box">
+      <div class="fallback-note">${auto ? "" : "If GPS is being shy, the spot itself holds a secret word — or ask the one who sent you. ♥"}</div>
+      <div class="code-row">
+        <input class="code" id="codeInput" type="text" autocomplete="off" autocapitalize="characters"
+               autocorrect="off" spellcheck="false" enterkeyhint="go"
+               placeholder="Secret word">
+      </div>
+      <button class="btn block" id="unlockBtn">Unlock</button>
+      <div id="feedback"></div>
+    </div>`;
+  const stop = CONFIG.stops[state.idx];
+  const input = box.querySelector("#codeInput");
+  const card = el.querySelector(".card");
+  const attempt = () => {
+    if (normalize(input.value) === normalize(stop.code)) {
+      input.blur();
+      arriveAtStop();
+    } else {
+      card.classList.remove("shake");
+      void card.offsetWidth;
+      card.classList.add("shake");
+      box.querySelector("#feedback").innerHTML =
+        `<div class="wrong-msg">Not quite — look a little closer. ♥</div>`;
+      input.select();
+    }
+  };
+  box.querySelector("#unlockBtn").addEventListener("click", attempt);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") attempt(); });
+  input.addEventListener("focus", () => {
+    setTimeout(() => input.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+  });
+}
+
+function showStop(i) {
+  const stop = CONFIG.stops[i];
+  const hasGeo = stop.lat != null && stop.lng != null;
+  render(`
+    ${progressHearts(i)}
+    <div class="eyebrow">Clue ${i + 1} of ${CONFIG.stops.length}</div>
+    <span class="stop-emoji">${stop.emoji}</span>
+    <h2 class="script">${escapeHtml(stop.title)}</h2>
+    <div class="card">
+      <p class="clue-text">${escapeHtml(stop.clue)}</p>
+      ${hasGeo ? geoChipHtml() : ""}
+      <button class="link-btn" id="hintBtn">Need a hint?</button>
+      <div id="hintBox"></div>
+      ${hasGeo ? `<button class="link-btn" id="fallbackToggle" style="display:block;margin:6px auto 0">Trouble with your location?</button>` : ""}
+      <div id="fallbackBox"></div>
+      ${DEMO ? `<button class="btn ghost block" id="demoArrive" style="margin-top:18px">📍 Simulate arrival (demo)</button>` : ""}
+    </div>
+  `, {
+    onMount(el) {
+      el.querySelector("#hintBtn").addEventListener("click", () => {
+        el.querySelector("#hintBox").innerHTML = `<div class="hint-text">${escapeHtml(stop.hint)}</div>`;
+      });
+
+      if (hasGeo) {
+        geo.streak = 0;
+        startWatch();
+        onGeoChange = dist => updateGeoChip(el, stop, dist);
+        // Paint the chip immediately from whatever we already know.
+        if (geo.lastPos) handlePosition(geo.lastPos); else updateGeoChip(el, stop, null);
+        el.querySelector("#fallbackToggle").addEventListener("click", () => showFallback(el, false));
+      } else {
+        // No coordinates for this stop — it's a code-word stop.
+        showFallback(el, true);
+      }
+
+      if (DEMO) {
+        el.querySelector("#demoArrive").addEventListener("click", () => arriveAtStop());
+      }
+    }
+  });
+}
+
+function showArrived() {
+  const i = state.idx;
+  const stop = CONFIG.stops[i];
+  const last = i === CONFIG.stops.length - 1;
+  burstConfetti(last ? 90 : 40);
+  render(`
+    ${progressHearts(i + 1)}
+    <span class="unlock-check">${last ? "💖" : "📍"}</span>
+    <h2 class="script">You're here…</h2>
+    <div class="card">
+      <p class="clue-text">${escapeHtml(stop.arrivalMessage)}</p>
+      <button class="btn block big" id="nextBtn" style="margin-top:22px">
+        ${last ? "I'm ready ♥" : "Reveal the next clue →"}
+      </button>
+    </div>
+  `, {
+    onMount(el) {
+      el.querySelector("#nextBtn").addEventListener("click", () => {
+        if (last) {
+          showBuildup();
+        } else {
+          state = { idx: i + 1, phase: "clue" };
+          setState(state);
+          showStop(i + 1);
+        }
+      });
+    }
+  });
+}
+
+function showBuildup() {
+  state = { idx: CONFIG.stops.length, phase: "buildup" };
+  setState(state);
+  stopWatch(); // the hunt is over — no more GPS needed
+  const lines = CONFIG.buildupLines.map((l, idx) =>
+    `<p class="buildup-line" style="animation-delay:${idx * 1.6}s">${escapeHtml(l)}</p>`
+  ).join("");
+  const totalDelay = CONFIG.buildupLines.length * 1.6 + 0.8;
+  render(`
+    <div>${lines}</div>
+    <div id="bigQuestion" style="opacity:0"></div>
+  `, {
+    onMount(el) {
+      setTimeout(() => {
+        const q = el.querySelector("#bigQuestion");
+        q.style.opacity = "1";
+        q.innerHTML = `
+          <div class="proposal-title">${escapeHtml(CONFIG.proposalQuestion)}</div>
+          <div class="yes-row">
+            <button class="btn big" id="yesBtn">${escapeHtml(CONFIG.yesButton)}</button>
+            <button class="btn ghost" id="yesBtn2">${escapeHtml(CONFIG.yesButtonAlt)}</button>
+          </div>`;
+        startHeartRain();
+        const celebrate = () => showCelebration();
+        q.querySelector("#yesBtn").addEventListener("click", celebrate);
+        q.querySelector("#yesBtn2").addEventListener("click", celebrate);
+      }, totalDelay * 1000);
+    }
+  });
+}
+
+function showCelebration() {
+  state = { idx: CONFIG.stops.length, phase: "celebrate" };
+  setState(state);
+  stopWatch();
+  burstConfetti(160);
+  setTimeout(() => burstConfetti(120), 900);
+  setTimeout(() => burstConfetti(120), 2000);
+  render(`
+    <span class="unlock-check">💍</span>
+    <h1 class="script" style="font-size:52px">${escapeHtml(CONFIG.celebrationTitle)}</h1>
+    <div class="celebrate-names">${escapeHtml(CONFIG.herName)} &amp; ${escapeHtml(CONFIG.yourName)}</div>
+    <div class="card">
+      <p class="clue-text">${escapeHtml(CONFIG.celebrationMessage)}</p>
+    </div>
+  `);
+  startHeartRain();
+}
+
+/* ---------- ambience: floating hearts ---------- */
+let heartTimer = null;
+function spawnHeart() {
+  const h = document.createElement("div");
+  h.className = "bg-heart";
+  h.textContent = ["💗", "💕", "🤍", "💖"][Math.floor(Math.random() * 4)];
+  h.style.left = Math.random() * 100 + "vw";
+  h.style.bottom = "-30px";
+  h.style.fontSize = 14 + Math.random() * 18 + "px";
+  h.style.animationDuration = 9 + Math.random() * 8 + "s";
+  document.body.appendChild(h);
+  setTimeout(() => h.remove(), 18000);
+}
+function startAmbience() {
+  if (heartTimer) return;
+  spawnHeart();
+  heartTimer = setInterval(spawnHeart, 2600);
+}
+function startHeartRain() {
+  for (let i = 0; i < 10; i++) setTimeout(spawnHeart, i * 220);
+}
+
+/* ---------- confetti ---------- */
+const canvas = document.getElementById("confetti");
+const ctx = canvas.getContext("2d");
+let particles = [];
+let confettiRunning = false;
+
+function sizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = innerWidth * dpr;
+  canvas.height = innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", sizeCanvas);
+sizeCanvas();
+
+const CONFETTI_COLORS = ["#c94f6d", "#e88aa0", "#c9a15a", "#f6d5d3", "#a83b57", "#ffffff"];
+function burstConfetti(count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: innerWidth / 2 + (Math.random() - 0.5) * 120,
+      y: innerHeight * 0.35,
+      vx: (Math.random() - 0.5) * 11,
+      vy: -(Math.random() * 11 + 5),
+      size: Math.random() * 7 + 4,
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      rot: Math.random() * Math.PI * 2,
+      vrot: (Math.random() - 0.5) * 0.25,
+      shape: Math.random() < 0.18 ? "heart" : "rect",
+    });
+  }
+  if (!confettiRunning) { confettiRunning = true; requestAnimationFrame(tickConfetti); }
+}
+function tickConfetti() {
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  particles = particles.filter(p => p.y < innerHeight + 40);
+  for (const p of particles) {
+    p.vy += 0.32;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.992;
+    p.rot += p.vrot;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    if (p.shape === "heart") {
+      ctx.font = p.size * 2 + "px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("❤️", 0, 0);
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.62);
+    }
+    ctx.restore();
+  }
+  if (particles.length) requestAnimationFrame(tickConfetti);
+  else { confettiRunning = false; ctx.clearRect(0, 0, innerWidth, innerHeight); }
+}
+
+/* ---------- secret reset: tap the footer 5x fast ---------- */
+let taps = [];
+document.getElementById("resetHeart").addEventListener("click", () => {
+  const now = Date.now();
+  taps = taps.filter(t => now - t < 2500);
+  taps.push(now);
+  if (taps.length >= 5) {
+    taps = [];
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+});
+
+/* ---------- util ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+/* ---------- boot: resume where she left off ---------- */
+startAmbience();
+if (!state) {
+  showIntro();
+} else if (state.phase === "clue") {
+  // Permission was already granted mid-hunt, so the watch restarts
+  // silently. If it can't, the chip offers the fix + fallback word.
+  startWatch();
+  requestWakeLock();
+  showStop(state.idx);
+} else if (state.phase === "arrived") {
+  showArrived();
+} else if (state.phase === "buildup") {
+  showBuildup();
+} else {
+  showCelebration();
+}
+</script>
+</body>
+</html>
